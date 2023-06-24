@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>X-Ray Classification</title>
+  <script src="https://cdn.jsdelivr.net/npm/onnxjs/dist/onnx.min.js" onload="initializeModel()"></script>
+  <script>
+    let model;
+
+    async function initializeModel() {
+      try {
+        const modelURL = 'https://raw.githubusercontent.com/kevinwornath/onnx/main/my_model.onnx';
+        model = await onnx.Model.create(modelURL);
+
+        // Enable the Run Model button once the model is loaded
+        const runButton = document.getElementById('runButton');
+        runButton.disabled = false;
+      } catch (error) {
+        console.error('Error initializing the model:', error);
+      }
+    }
+
+    async function runModel() {
+      try {
+        const fileInput = document.getElementById('fileInput');
+        const file = fileInput.files[0];
+
+        if (!file) {
+          console.error('No file selected.');
+          return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = async function(e) {
+          try {
+            const dataURL = e.target.result;
+
+            const img = document.createElement('img');
+            img.src = dataURL;
+
+            const tensor = onnx.Tensor.fromImage(img);
+            const preprocessed = tensor.resize([64, 64]).div(255);
+
+            const outputMap = await model.predict({ input: preprocessed });
+
+            const outputTensor = outputMap.values().next().value;
+            const outputData = outputTensor.data;
+            const classIndex = outputData.indexOf(Math.max(...outputData));
+            const classNames = ['Normal', 'Pneumonia'];
+            const predictionLabel = classNames[classIndex];
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = `Prediction: ${predictionLabel}`;
+          } catch (error) {
+            console.error('Error running the model:', error);
+          }
+        };
+
+        reader.readAsDataURL(file);
+      } catch (error) {
+        console.error('Error processing the file:', error);
+      }
+    }
+  </script>
+</head>
+<body>
+  <h1>X-Ray Classification</h1>
+  <input type="file" id="fileInput" accept=".jpg,.jpeg,.png">
+  <button id="runButton" onclick="runModel()" disabled>Run Model</button>
+  <div id="result"></div>
+</body>
+</html>
